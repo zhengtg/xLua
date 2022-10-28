@@ -34,11 +34,83 @@ find_path(XLUA_PROJECT_DIR NAMES SConstruct
 MARK_AS_ADVANCED(XLUA_PROJECT_DIR)
 
 if (NOT LUA_VERSION)
-    set(LUA_VERSION "5.3.5")
+    set(LUA_VERSION "5.4.4")
 endif()
 
 set(LUA_SRC_PATH lua-${LUA_VERSION}/src)
 set(LUAJIT_SRC_PATH luajit-2.1.0b3/src)
+
+#begin lua-rapidjson
+set (RAPIDJSON_SRC 
+    lua-rapidjson/src/Document.cpp
+    lua-rapidjson/src/Schema.cpp
+    lua-rapidjson/src/Userdata.hpp
+    lua-rapidjson/src/file.hpp
+    lua-rapidjson/src/luax.hpp
+    lua-rapidjson/src/rapidjson.cpp
+    lua-rapidjson/src/values.cpp
+    lua-rapidjson/src/values.hpp
+	)
+set_property(
+	SOURCE ${RAPIDJSON_SRC}
+	APPEND
+	PROPERTY COMPILE_DEFINITIONS
+	LUA_LIB
+)
+list(APPEND THIRDPART_INC  lua-rapidjson/rapidjson/include)
+set (THIRDPART_SRC ${THIRDPART_SRC} ${RAPIDJSON_SRC})
+#end lua-rapidjson
+
+#begin lua-profobuf
+set (LPB_SRC 
+	lua-protobuf/pb.c
+)
+set_property(
+	SOURCE ${LPB_SRC}
+	APPEND
+	PROPERTY COMPILE_DEFINITIONS
+	LUA_LIB
+)
+list(APPEND THIRDPART_INC lua-protobuf)
+set (THIRDPART_SRC ${THIRDPART_SRC} ${LPB_SRC})
+#end lua-protobuf
+
+#begin lpeg
+set ( LPEG_SRC
+    lpeg-1.0.2/lpcap.c
+    lpeg-1.0.2/lpcode.c
+    lpeg-1.0.2/lpprint.c
+    lpeg-1.0.2/lptree.c
+    lpeg-1.0.2/lpvm.c
+)
+set_property(
+    SOURCE ${LPEG_SRC}
+    APPEND
+    PROPERTY COMPILE_DEFINITIONS
+    LUA_LIB
+)
+list(APPEND THIRDPART_INC  lpeg)
+set (THIRDPART_SRC ${THIRDPART_SRC} ${LPEG_SRC})
+#end lpeg
+
+#begin luaecs
+set (LUAECS_SRC 
+    luaecs/luaecs.c
+    luaecs/ecs_capi.c
+    luaecs/ecs_entityid.c
+    luaecs/ecs_group.c
+    luaecs/ecs_template.c
+    luaecs/ecs_persistence.c
+    )
+set_property(
+    SOURCE ${LUAECS_SRC}
+    APPEND
+    PROPERTY COMPILE_DEFINITIONS
+    LUA_LIB
+)
+list(APPEND THIRDPART_INC  luaecs)
+set (THIRDPART_SRC ${THIRDPART_SRC} ${LUAECS_SRC})
+#end luaecs
 
 if (USING_LUAJIT)
 	
@@ -70,7 +142,10 @@ if (USING_LUAJIT)
 else ()
 	set ( LUA_IDSIZE 120 CACHE STRING "gives the maximum size for the description of the source." )
 
-	configure_file ( ${LUA_SRC_PATH}/luaconf.h.in ${CMAKE_CURRENT_BINARY_DIR}/luaconf.h )
+    if(EXISTS ${LUA_SRC_PATH}/luaconf.h.in)
+        configure_file ( ${LUA_SRC_PATH}/luaconf.h.in ${CMAKE_CURRENT_BINARY_DIR}/luaconf.h )
+    endif()
+	# configure_file ( ${LUA_SRC_PATH}/luaconf.h.in ${CMAKE_CURRENT_BINARY_DIR}/luaconf.h )
 
 	include_directories(
 	    ${CMAKE_SOURCE_DIR}
@@ -180,6 +255,20 @@ if (APPLE)
             #set_target_properties ( xlua PROPERTIES MACOSX_RPATH TRUE )
         endif ()
     endif ()
+
+    if(${CMAKE_VERSION} VERSION_LESS "3.1.0")
+        if(CMAKE_COMPILER_IS_GNUCXX)
+            execute_process(COMMAND "${CMAKE_CXX_COMPILER} -dumpversion" OUTPUT_VARIABLE GCC_VERSION)
+            if (GCC_VERSION VERSION_LESS 4.7)
+                set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+            else()
+                set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+            endif()
+        endif()
+    else()
+        target_compile_features(xlua PRIVATE cxx_rvalue_references)
+    endif()
+
 elseif ("${CMAKE_SYSTEM_NAME}" STREQUAL "Switch")
     add_library(xlua STATIC
         ${LUA_CORE}
